@@ -1,4 +1,4 @@
-module github.com/madflojo/tasks
+module github.com/Kepler452/tasks
 
 go 1.17
 
