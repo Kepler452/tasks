@@ -2,11 +2,28 @@ package tasks
 
 import (
 	"fmt"
+	"log"
 	"testing"
 	"time"
 
 	"github.com/rs/xid"
 )
+
+func TestMaxTime(t *testing.T) {
+	scheduler := New()
+	defer scheduler.Stop()
+	scheduler.Add(&Task{
+		Interval: time.Duration(2 * time.Second),
+		MaxTimes: 3,
+		TaskFunc: func() error {
+			log.Println("11111111111111111")
+			return nil
+		},
+		ErrFunc: func(e error) {},
+	})
+	time.Sleep(15 * time.Second)
+
+}
 
 func TestAdd(t *testing.T) {
 	// Create a base scheduler to use

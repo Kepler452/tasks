@@ -29,7 +29,6 @@ Below is an example of starting the scheduler and registering a new task that ru
 		// Do Stuff
 	}
 
-
 Sometimes schedules need to started at a later time. This package provides the ability to start a task only after
 a certain time. The below example shows this in practice.
 
@@ -77,7 +76,6 @@ error occurs.
 	if err != nil {
 		// Do Stuff
 	}
-
 */
 package tasks
 
@@ -118,6 +116,10 @@ type Task struct {
 	// the interval specified until deleted. With RunOnce enabled the first execution of the task will result in
 	// the task self deleting.
 	RunOnce bool
+
+	MaxTimes int
+
+	currentTime int
 
 	// StartAfter is used to specify a start time for the scheduler. When set, tasks will wait for the specified
 	// time to start the schedule timer.
@@ -173,20 +175,19 @@ func New() *Scheduler {
 // execute. This means a task with a 15 second interval will be triggered 15 seconds after Add is complete. Not before
 // or after (excluding typical machine time jitter).
 //
-//  // Add a task
-//  id, err := scheduler.Add(&tasks.Task{
-//  	Interval: time.Duration(30 * time.Second),
-//  	TaskFunc: func() error {
-//  		// Put your logic here
-//  	}(),
-//  	ErrFunc: func(err error) {
-//  		// Put custom error handling here
-//  	}(),
-//  })
-//  if err != nil {
-//  	// Do stuff
-//  }
-//
+//	// Add a task
+//	id, err := scheduler.Add(&tasks.Task{
+//		Interval: time.Duration(30 * time.Second),
+//		TaskFunc: func() error {
+//			// Put your logic here
+//		}(),
+//		ErrFunc: func(err error) {
+//			// Put custom error handling here
+//		}(),
+//	})
+//	if err != nil {
+//		// Do stuff
+//	}
 func (schd *Scheduler) Add(t *Task) (string, error) {
 	id := xid.New()
 	err := schd.AddWithID(id.String(), t)
@@ -214,7 +215,6 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 //	if err != nil {
 //		// Do stuff
 //	}
-//
 func (schd *Scheduler) AddWithID(id string, t *Task) error {
 	// Check if TaskFunc is nil before doing anything
 	if t.TaskFunc == nil {
@@ -324,7 +324,18 @@ func (schd *Scheduler) scheduleTask(t *Task) {
 // execTask is the underlying scheduler, it is used to trigger and execute tasks.
 func (schd *Scheduler) execTask(t *Task) {
 	go func() {
+		if t.MaxTimes == 0 {
+			if t.currentTime > 0 {
+				return
+			}
+		} else {
+			if t.currentTime >= t.MaxTimes {
+				defer schd.Del(t.id)
+				return
+			}
+		}
 		err := t.TaskFunc()
+		defer func() { t.currentTime++ }()
 		if err != nil && t.ErrFunc != nil {
 			go t.ErrFunc(err)
 		}
