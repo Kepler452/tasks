@@ -2,7 +2,6 @@ package tasks
 
 import (
 	"fmt"
-	"log"
 	"testing"
 	"time"
 
@@ -10,14 +9,14 @@ import (
 )
 
 func TestMaxTime(t *testing.T) {
-	scheduler := New()
+	scheduler := New[int]()
 	defer scheduler.Stop()
-	scheduler.Add(&Task{
+	scheduler.Add(&Task[int]{
+		Param:    1,
 		Interval: time.Duration(2 * time.Second),
 		MaxTimes: 3,
-		TaskFunc: func() error {
-			log.Println("11111111111111111")
-			return nil
+		TaskFunc: func(param int) error {
+			return ErrStopTask
 		},
 		ErrFunc: func(e error) {},
 	})
@@ -27,13 +26,13 @@ func TestMaxTime(t *testing.T) {
 
 func TestAdd(t *testing.T) {
 	// Create a base scheduler to use
-	scheduler := New()
+	scheduler := New[string]()
 	defer scheduler.Stop()
 
 	t.Run("Add a valid task and look it up", func(t *testing.T) {
-		id, err := scheduler.Add(&Task{
+		id, err := scheduler.Add(&Task[string]{
 			Interval: time.Duration(1 * time.Minute),
-			TaskFunc: func() error { return nil },
+			TaskFunc: func(param string) error { return nil },
 			ErrFunc:  func(e error) {},
 		})
 		if err != nil {
@@ -54,9 +53,9 @@ func TestAdd(t *testing.T) {
 
 	t.Run("Add a valid task with an id and look it up", func(t *testing.T) {
 		id := xid.New()
-		err := scheduler.AddWithID(id.String(), &Task{
+		err := scheduler.AddWithID(id.String(), &Task[string]{
 			Interval: time.Duration(1 * time.Minute),
-			TaskFunc: func() error { return nil },
+			TaskFunc: func(param string) error { return nil },
 			ErrFunc:  func(e error) {},
 		})
 		if err != nil {
@@ -80,9 +79,9 @@ func TestAdd(t *testing.T) {
 		doneCh := make(chan struct{})
 
 		// Setup A task
-		id, err := scheduler.Add(&Task{
+		id, err := scheduler.Add(&Task[string]{
 			Interval: time.Duration(1 * time.Second),
-			TaskFunc: func() error {
+			TaskFunc: func(param string) error {
 				doneCh <- struct{}{}
 				return nil
 			},
@@ -92,9 +91,9 @@ func TestAdd(t *testing.T) {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
 		}
 
-		err = scheduler.AddWithID(id, &Task{
+		err = scheduler.AddWithID(id, &Task[string]{
 			Interval: time.Duration(1 * time.Minute),
-			TaskFunc: func() error { return nil },
+			TaskFunc: func(param string) error { return nil },
 			ErrFunc:  func(e error) {},
 		})
 		if err != ErrIDInUse {
@@ -108,7 +107,7 @@ func TestAdd(t *testing.T) {
 	})
 
 	t.Run("Check for nil callback", func(t *testing.T) {
-		_, err := scheduler.Add(&Task{
+		_, err := scheduler.Add(&Task[string]{
 			Interval: time.Duration(1 * time.Minute),
 			ErrFunc:  func(e error) {},
 		})
@@ -118,8 +117,8 @@ func TestAdd(t *testing.T) {
 	})
 
 	t.Run("Check for nil interval", func(t *testing.T) {
-		_, err := scheduler.Add(&Task{
-			TaskFunc: func() error { return nil },
+		_, err := scheduler.Add(&Task[string]{
+			TaskFunc: func(param string) error { return nil },
 			ErrFunc:  func(e error) {},
 		})
 		if err == nil {
@@ -130,16 +129,16 @@ func TestAdd(t *testing.T) {
 
 func TestScheduler(t *testing.T) {
 	// Create a base scheduler to use
-	scheduler := New()
+	scheduler := New[string]()
 
 	t.Run("Verify Tasks Run when Added", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
 		doneCh := make(chan struct{})
 
 		// Setup A task
-		id, err := scheduler.Add(&Task{
+		id, err := scheduler.Add(&Task[string]{
 			Interval: time.Duration(1 * time.Second),
-			TaskFunc: func() error {
+			TaskFunc: func(param string) error {
 				doneCh <- struct{}{}
 				return nil
 			},
@@ -169,10 +168,10 @@ func TestScheduler(t *testing.T) {
 		sa := time.Now().Add(10 * time.Second)
 
 		// Setup A task
-		id, err := scheduler.Add(&Task{
+		id, err := scheduler.Add(&Task[string]{
 			Interval:   time.Duration(1 * time.Second),
 			StartAfter: sa,
-			TaskFunc: func() error {
+			TaskFunc: func(param string) error {
 				doneCh <- struct{}{}
 				return nil
 			},
@@ -198,7 +197,7 @@ func TestScheduler(t *testing.T) {
 
 func TestSchedulerDoesntRun(t *testing.T) {
 	// Create a base scheduler to use
-	scheduler := New()
+	scheduler := New[string]()
 
 	t.Run("Verify Cancelling a StartAfter works as expected", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
@@ -208,10 +207,10 @@ func TestSchedulerDoesntRun(t *testing.T) {
 		sa := time.Now().Add(10 * time.Second)
 
 		// Setup A task
-		id, err := scheduler.Add(&Task{
+		id, err := scheduler.Add(&Task[string]{
 			Interval:   time.Duration(1 * time.Second),
 			StartAfter: sa,
-			TaskFunc: func() error {
+			TaskFunc: func(param string) error {
 				doneCh <- struct{}{}
 				return nil
 			},
@@ -239,9 +238,9 @@ func TestSchedulerDoesntRun(t *testing.T) {
 		doneCh := make(chan struct{})
 
 		// Setup A task
-		id, err := scheduler.Add(&Task{
+		id, err := scheduler.Add(&Task[string]{
 			Interval: time.Duration(1 * time.Second),
-			TaskFunc: func() error {
+			TaskFunc: func(param string) error {
 				doneCh <- struct{}{}
 				return nil
 			},
@@ -275,17 +274,17 @@ func TestSchedulerDoesntRun(t *testing.T) {
 
 func TestSchedulerExtras(t *testing.T) {
 	// Create a base scheduler to use
-	scheduler := New()
+	scheduler := New[string]()
 
 	t.Run("Verify RunOnce works as expected", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
 		doneCh := make(chan struct{})
 
 		// Setup A task
-		id, err := scheduler.Add(&Task{
+		id, err := scheduler.Add(&Task[string]{
 			Interval: time.Duration(1 * time.Second),
 			RunOnce:  true,
-			TaskFunc: func() error {
+			TaskFunc: func(param string) error {
 				doneCh <- struct{}{}
 				return nil
 			},
@@ -318,9 +317,9 @@ func TestSchedulerExtras(t *testing.T) {
 		doneCh := make(chan struct{})
 
 		// Add task
-		_, err := scheduler.Add(&Task{
+		_, err := scheduler.Add(&Task[string]{
 			Interval: time.Duration(1 * time.Second),
-			TaskFunc: func() error { return fmt.Errorf("Errors are bad") },
+			TaskFunc: func(param string) error { return fmt.Errorf("Errors are bad") },
 			ErrFunc:  func(e error) { doneCh <- struct{}{} },
 		})
 		if err != nil {
